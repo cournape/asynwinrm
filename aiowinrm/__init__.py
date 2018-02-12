@@ -5,4 +5,4 @@ except ImportError:
     version_info = (0, 0, 0, "dev", 0)
     version = "0.0.0.dev0"
 
-from .api import run_cmd
+from .api import run_cmd, run_ps

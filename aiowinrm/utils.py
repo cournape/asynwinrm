@@ -1,5 +1,4 @@
 import re
-import urllib.parse
 
 from .constants import TranportKind
 
@@ -14,19 +13,22 @@ R_HOST = re.compile("""
 
 
 # Adapted from pywinrm
-def parse_host(url, transport=TranportKind.ssl):
+def parse_host(url, transport):
     match = R_HOST.match(url)
     scheme = match.group('scheme')
-    if not scheme:
+    port = match.group('port')
+    if scheme and not port:
+        port = 5986 if scheme == "https" else 5985
+
+    else:
         if transport == TranportKind.http:
             scheme = "http"
         elif transport == TranportKind.ssl:
             scheme = "https"
         else:
-            raise ValueError("Invalid tranport {!r}".format(tranport))
+            raise ValueError("Invalid tranport {!r}".format(transport))
 
     host = match.group('host')
-    port = match.group('port')
     if not port:
         port = 5986 if transport == TranportKind.ssl else 5985
     path = match.group('path')

@@ -14,7 +14,7 @@ class ShellContext(object):
     def __init__(self, session, host, env=None, cwd=None):
         self._session = session
 
-        self.host = parse_host(host, transport=TranportKind.http)
+        self.host = host
 
         self.env = env
         self.cwd = cwd
@@ -27,6 +27,11 @@ class ShellContext(object):
         resp = await _make_winrm_request(
             self._session, self.host, payload
         )
+        if resp.status == 401:
+            await resp.release()
+            raise AIOWinRMException(
+                "Unauthorized {}".format(resp.status)
+            )
         if resp.status != 200:
             await resp.release()
             raise AIOWinRMException(
@@ -53,7 +58,7 @@ class CommandContext(object):
     def __init__(self, session, host, shell_id, command, args=()):
         self._session = session
 
-        self.host = parse_host(host, transport=TranportKind.http)
+        self.host = host
         self.command = command
         self.args = args
 
