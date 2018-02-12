@@ -13,24 +13,25 @@ R_HOST = re.compile("""
 
 
 # Adapted from pywinrm
-def parse_host(url, transport):
+# changed transport to default_transport so that it doesn't just change ports
+def parse_host(url, default_transport):
     match = R_HOST.match(url)
     scheme = match.group('scheme')
     port = match.group('port')
-    if scheme and not port:
-        port = 5986 if scheme == "https" else 5985
-
+    if scheme:
+        if not port:
+            port = 5986 if scheme == "https" else 5985
     else:
-        if transport == TranportKind.http:
+        if default_transport == TranportKind.http:
             scheme = "http"
-        elif transport == TranportKind.ssl:
+        elif default_transport == TranportKind.ssl:
             scheme = "https"
         else:
-            raise ValueError("Invalid tranport {!r}".format(transport))
+            raise ValueError("Invalid tranport {!r}".format(default_transport))
 
     host = match.group('host')
     if not port:
-        port = 5986 if transport == TranportKind.ssl else 5985
+        port = 5986 if default_transport == TranportKind.ssl else 5985
     path = match.group('path')
     if not path:
         path = 'wsman'

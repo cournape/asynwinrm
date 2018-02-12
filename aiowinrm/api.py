@@ -69,7 +69,7 @@ async def run_cmd(host,
     """
     Run the given command on the given host asynchronously.
     """
-    host = parse_host(host, transport=default_transport)
+    host = parse_host(host, default_transport=default_transport)
     connector = aiohttp.TCPConnector(loop=asyncio.get_event_loop(),
                                      verify_ssl=verify_ssl)
     async with aiohttp.ClientSession(auth=auth, connector=connector) as session:
