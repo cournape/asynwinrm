@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:b="http://schemas.dmtf.org/wbem/wsman/1/cimbinding.xsd" xmlns:cfg="http://schemas.microsoft.com/wbem/wsman/1/config" xmlns:n="http://schemas.xmlsoap.org/ws/2004/09/enumeration" xmlns:p="http://schemas.microsoft.com/wbem/wsman/1/wsman.xsd" xmlns:rsp="http://schemas.microsoft.com/wbem/wsman/1/windows/shell" xmlns:w="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd" xmlns:x="http://schemas.xmlsoap.org/ws/2004/09/transfer" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+   <env:Header>
+      <a:To>https://192.168.1.137:5986/wsman</a:To>
+      <a:ReplyTo>
+         <a:Address mustUnderstand="true">http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous</a:Address>
+      </a:ReplyTo>
+      <w:MaxEnvelopeSize mustUnderstand="true">153600</w:MaxEnvelopeSize>
+      <a:MessageID>uuid:0C8BB994-0C90-4FC0-AFC6-0E8B3C08B269</a:MessageID>
+      <p:SessionId mustUnderstand="false">uuid:5CDCD4D7-3613-41C6-8386-F7EF6B9C910E</p:SessionId>
+      <w:Locale xml:lang="en-US" mustUnderstand="false" />
+      <p:DataLocale xml:lang="en-US" mustUnderstand="false" />
+      <w:OperationTimeout>PT60S</w:OperationTimeout>
+      <w:ResourceURI mustUnderstand="true">http://schemas.microsoft.com/powershell/Microsoft.PowerShell</w:ResourceURI>
+      <a:Action mustUnderstand="true">http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Receive</a:Action>
+      <w:OptionSet>
+         <w:Option Name="WSMAN_CMDSHELL_OPTION_KEEPALIVE">TRUE</w:Option>
+      </w:OptionSet>
+      <w:SelectorSet>
+         <w:Selector Name="ShellId">E233E1DB-5D89-4907-BD0B-20C200509D38</w:Selector>
+      </w:SelectorSet>
+   </env:Header>
+   <env:Body>
+      <rsp:Receive>
+         <rsp:DesiredStream>stdout</rsp:DesiredStream>
+      </rsp:Receive>
+   </env:Body>
+</env:Envelope>

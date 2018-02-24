@@ -19,6 +19,7 @@ class Header:
     max_envelope_size = attr(default=None, validator=optional(instance_of(int)))
     timeout = attr(default="PT60S")
     shell_id = attr(default=None, validator=optional(instance_of(str)))
+    session_id = attr(default=None, validator=optional(instance_of(str)))
     resource_uri = attr(default="http://schemas.microsoft.com/wbem/wsman/1/windows/shell/cmd")
     options = attr(validator=instance_of(dict), default=Factory(dict))
 
@@ -61,6 +62,10 @@ class Header:
 
         message_id = etree.SubElement(header, ADDRESSING + "MessageID")
         message_id.text = "uuid:{}".format(str(self.id))
+
+        if self.session_id:
+            session_id = etree.SubElement(header, ADDRESSING + "SessionId")
+            session_id.text = "uuid:{}".format(str(self.session_id))
 
         if self.shell_id:
             selector_set = etree.SubElement(

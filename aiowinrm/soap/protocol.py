@@ -5,7 +5,7 @@ import six
 import lxml.etree as etree
 
 from .header import Header
-from .namespaces import NAMESPACE, SOAP_ENV, WIN_SHELL
+from .namespaces import NAMESPACE, SOAP_ENV, WIN_SHELL, ADDRESSING
 
 
 def create_shell_payload(env=None, cwd=None):
@@ -48,6 +48,61 @@ def create_shell_payload(env=None, cwd=None):
             shell, WIN_SHELL + "WorkingDirectory"
         )
         working_directory.text = cwd
+
+    envelope = etree.Element(SOAP_ENV + "Envelope", nsmap=NAMESPACE)
+    envelope.append(header.to_dom())
+    envelope.append(body)
+
+    return envelope
+
+
+def create_power_shell_payload(session_id, creation_payload):
+    session_id = str(session_id).upper()
+    header = Header(
+        action="http://schemas.xmlsoap.org/ws/2004/09/transfer/Create",
+        session_id="",
+        options={"protocolversion": "2.3"},
+        resource_uri="http://schemas.microsoft.com/powershell/Microsoft.PowerShell",
+        timeout="PT60S"
+    )
+    body = etree.Element(SOAP_ENV + "Body")
+    shell = etree.SubElement(body, WIN_SHELL + "Shell")
+    shell.attrib['ShellId'] = session_id
+    output_streams = etree.SubElement(shell, WIN_SHELL + "OutputStreams")
+    output_streams.text = "stdout stderr"
+    input_streams = etree.SubElement(shell, WIN_SHELL + "InputStreams")
+    input_streams.text = "stdin pr"
+
+    assert isinstance(creation_payload, bytes)
+    creation_xml = etree.SubElement(shell, "creationXml")
+    creation_xml.text = base64.b64encode(creation_payload)
+    creation_xml.set('xmlns', 'http://schemas.microsoft.com/powershell')
+
+    envelope = etree.Element(SOAP_ENV + "Envelope", nsmap=NAMESPACE)
+    envelope.append(header.to_dom())
+    envelope.append(body)
+
+    return envelope
+
+
+def keepalive_msg(shell_id):
+    """
+
+    :param shell_id:
+    :return:
+    """
+    header = Header(
+        action="http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Receive",
+        shell_id=shell_id,
+        options={
+            "WSMAN_CMDSHELL_OPTION_KEEPALIVE": "TRUE"
+        },
+        resource_uri="http://schemas.microsoft.com/powershell/Microsoft.PowerShell"
+    )
+    body = etree.Element(SOAP_ENV + "Body")
+    receive = etree.SubElement(body, WIN_SHELL + "Receive")
+    desired_stream = etree.SubElement(receive, WIN_SHELL + "DesiredStream")
+    desired_stream.text = "stdout"
 
     envelope = etree.Element(SOAP_ENV + "Envelope", nsmap=NAMESPACE)
     envelope.append(header.to_dom())
@@ -112,6 +167,10 @@ def create_command(shell_id, command, args=()):
     return envelope
 
 
+def create_script(shell_id, script):
+    pass
+
+
 def cleanup_command(shell_id, command_id):
     """
     Clean-up after a command.
@@ -161,6 +220,15 @@ def command_output(shell_id, command_id):
     envelope.append(body)
 
     return envelope
+
+
+def parse_soap_response(response):
+    root = etree.fromstring(response)
+    action = root.find(SOAP_ENV + "Header/" + ADDRESSING + "Action")
+    if action is not None and action.text.endswith('fault'):
+        fault = root.find(SOAP_ENV + "Body/" + SOAP_ENV + "Fault/" + SOAP_ENV + "Reason/" + SOAP_ENV + "Text")
+        raise Exception(fault.text)
+    return root
 
 
 def parse_command_output(response):

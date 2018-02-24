@@ -5,8 +5,8 @@ import aiohttp
 import asyncio
 
 from aiowinrm.constants import TranportKind
+from aiowinrm.core import PowerShellContext, ShellContext, CommandContext
 from aiowinrm.utils import parse_host
-from .core import CommandContext, ShellContext
 import xml.etree.ElementTree as ET
 
 
@@ -120,3 +120,28 @@ async def run_ps(host,
 
 
 
+async def run_psrp(host,
+                   auth,
+                   script,
+                   default_transport=TranportKind.http,
+                   verify_ssl=True):
+    """
+    run PowerShell script
+
+    :param host:
+    :param auth:
+    :param script:
+    :param default_transport:
+    :param verify_ssl:
+    :return:
+    """
+    if chr(65279) in script:
+        pos = script.index(chr(65279))
+        raise Exception('Illegal character found in script at position {}'.format(pos))
+
+    host = parse_host(host, default_transport=default_transport)
+    connector = aiohttp.TCPConnector(loop=asyncio.get_event_loop(),
+                                     verify_ssl=verify_ssl)
+    async with aiohttp.ClientSession(auth=auth, connector=connector) as session:
+        async with PowerShellContext(session, host, script=script) as pwr_shell_context:
+            print(pwr_shell_context.shell_id, pwr_shell_context.session_id)
