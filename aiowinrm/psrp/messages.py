@@ -51,7 +51,7 @@ import lxml.etree as etree
 
 from aiowinrm.psrp.init_runspace_xml import INIT_RUNSPACE_XML
 from aiowinrm.psrp.message import Message
-
+from aiowinrm.psrp.pipeline_xml import get_pipeline_xml
 
 REMOVE_BLANKS_PARSER = etree.XMLParser(remove_blank_text=True)
 
@@ -77,3 +77,10 @@ def create_session_capability_message(runspace_id):
 
 def init_runspace_pool_message(runspace_id):
     return Message(runspace_id, message_type='init_runspacepool', data=INIT_RUNSPACE_XML)
+
+
+def create_pipeline_message(runspace_id, pipeline_id, script):
+    return Message(runspace_id,
+                   message_type='create_pipeline',
+                   data=get_pipeline_xml(script),
+                   pipeline_id=pipeline_id)

@@ -1,3 +1,4 @@
+import re
 import struct
 import uuid
 
@@ -56,3 +57,16 @@ def uuid_to_windows_guid_bytes(uuid_in):
     assert isinstance(uuid_in, uuid.UUID)
     return uuid_in.bytes_le
 
+
+def remove_bom(text):
+    return text.replace("\xef\xbb\xbf", "")
+
+
+def horizontal_white_space_replace(match):
+    raise NotImplementedError()
+
+
+def strip_hex_white_space(text):
+    # \h does not exist in python
+    text = text.replace("_x000D__x000A_", "\n")
+    return re.sub(r'_x(\s{4})_', horizontal_white_space_replace, text, flags=re.UNICODE)

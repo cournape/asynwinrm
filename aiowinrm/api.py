@@ -143,5 +143,6 @@ async def run_psrp(host,
     connector = aiohttp.TCPConnector(loop=asyncio.get_event_loop(),
                                      verify_ssl=verify_ssl)
     async with aiohttp.ClientSession(auth=auth, connector=connector) as session:
-        async with PowerShellContext(session, host, script=script) as pwr_shell_context:
-            print(pwr_shell_context.shell_id, pwr_shell_context.session_id)
+        async with PowerShellContext(session, host) as pwr_shell_context:
+            res = await pwr_shell_context.run_script(script)
+            stdout, stderr, return_code = res

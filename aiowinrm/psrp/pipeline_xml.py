@@ -1,3 +1,5 @@
+import lxml.etree as etree
+
 PSRP_TEMPLATE = """
 <Obj RefId="0">
   <MS>
@@ -66,7 +68,7 @@ PSRP_TEMPLATE = """
                     <Obj RefId="13">
                       <MS>
                         <Nil N="N" />
-                        <S N="V">{command}</S>
+                        <S N="V">COMMAND HERE</S>
                       </MS>
                     </Obj>
                   </LST>
@@ -168,6 +170,10 @@ PSRP_TEMPLATE = """
 </Obj>
 """
 
+TEMPLATE_NOD = etree.fromstring(PSRP_TEMPLATE)
 
 def get_pipeline_xml(command):
-    return PSRP_TEMPLATE.format(command=command)
+    assert isinstance(command, str)
+    command_nod = TEMPLATE_NOD.findall(".//*[@RefId='13']'")[0]
+    command_nod.text = command
+    return etree.tostring(TEMPLATE_NOD)

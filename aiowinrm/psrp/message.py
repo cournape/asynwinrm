@@ -43,12 +43,21 @@ class Message(object):
         'pipeline_host_response': 0x00041101
     }
 
+    MESSAGE_TYPES_REV = {vl: ky for ky, vl in MESSAGE_TYPES.items()}
+
     def __init__(self, runspace_pool_id, message_type, data, pipeline_id=None, destination=SERVER_DESTINATION):
-        if message_type not in self.__class__.MESSAGE_TYPES:
-            raise Exception(f'invalid message type: {message_type}')
         assert isinstance(data, str)
         self.runspace_pool_id = runspace_pool_id
-        self.message_type = self.__class__.MESSAGE_TYPES[message_type]
+        if isinstance(message_type, str):
+            if message_type not in self.__class__.MESSAGE_TYPES:
+                raise Exception(f'invalid message type: {message_type}')
+            self.message_type = self.__class__.MESSAGE_TYPES[message_type]
+        elif isinstance(message_type, int):
+            if message_type not in self.__class__.MESSAGE_TYPES_REV:
+                raise Exception(f'invalid message type: {message_type}')
+            self.message_type = message_type
+        else:
+            raise Exception(f'invalid message type {message_type}')
         self.data = data
         self.pipeline_id = pipeline_id
         self.destination = destination
@@ -75,3 +84,13 @@ class Message(object):
             BYTE_ORDER_MARK,
             self.data.encode('utf-8')
         ))
+
+    @property
+    def message_type_name(self):
+        return self.__class__.MESSAGE_TYPES_REV[self.message_type]
+
+    def __repr__(self):
+        return f'{self.message_type_name}: {self.data}'
+
+    def __str__(self):
+        return self.data

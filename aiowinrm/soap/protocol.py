@@ -4,6 +4,7 @@ import six
 
 import lxml.etree as etree
 
+from aiowinrm.psrp.defragmenter import MessageDefragmenter
 from .header import Header
 from .namespaces import NAMESPACE, SOAP_ENV, WIN_SHELL, ADDRESSING
 
@@ -85,7 +86,47 @@ def create_power_shell_payload(session_id, creation_payload):
     return envelope
 
 
-def keepalive_msg(shell_id):
+def create_ps_pipeline(shell_id, pipeline_id, creation_payload):
+    assert isinstance(creation_payload, bytes)
+    shell_id = str(shell_id).upper()
+    header = Header(
+        action='http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Command',
+        shell_id=shell_id,
+        resource_uri="http://schemas.microsoft.com/powershell/Microsoft.PowerShell",
+        timeout="PT60S"
+    )
+    body = etree.Element(SOAP_ENV + "Body")
+    commandline = etree.SubElement(body, WIN_SHELL + "Commandline")
+    commandline.attrib['CommandId'] = pipeline_id
+    command = etree.SubElement(commandline, WIN_SHELL + "Command")
+    command.text = "Invoke-Expression"
+    arguments = etree.SubElement(commandline, WIN_SHELL + "Arguments")
+    arguments.text = base64.b64encode(creation_payload)
+
+    envelope = etree.Element(SOAP_ENV + "Envelope", nsmap=NAMESPACE)
+    envelope.append(header.to_dom())
+    envelope.append(body)
+
+    return envelope
+
+
+def create_send_payload(shell_id, command_id, send_payload):
+    assert isinstance(send_payload, bytes)
+    shell_id = str(shell_id).upper()
+    header = Header(
+        action='http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Send',
+        shell_id=shell_id,
+        resource_uri="http://schemas.microsoft.com/powershell/Microsoft.PowerShell",
+        timeout="PT60S"
+    )
+    body = etree.Element(SOAP_ENV + "Body")
+    stream = etree.SubElement(body, WIN_SHELL + "Stream")
+    stream.text = base64.b64encode(send_payload)
+    stream.attrib['Name'] = 'stdin'
+    stream.attrib['CommandId'] = command_id
+
+
+def get_ps_response(shell_id):
     """
 
     :param shell_id:
@@ -111,11 +152,13 @@ def keepalive_msg(shell_id):
     return envelope
 
 
-def close_shell_payload(shell_id):
+def close_shell_payload(shell_id, power_shell=False):
     header = Header(
         action="http://schemas.xmlsoap.org/ws/2004/09/transfer/Delete",
         shell_id=shell_id,
     )
+    if power_shell:
+        header.resource_uri = "http://schemas.microsoft.com/powershell/Microsoft.PowerShell"
 
     envelope = etree.Element(SOAP_ENV + "Envelope", nsmap=NAMESPACE)
     envelope.append(header.to_dom())
@@ -124,14 +167,6 @@ def close_shell_payload(shell_id):
     envelope.append(body)
 
     return envelope
-
-
-def parse_create_shell_response(response):
-    root = etree.fromstring(response)
-    return next(
-        node for node in root.findall('.//*')
-        if node.get('Name') == 'ShellId'
-    ).text
 
 
 def create_command(shell_id, command, args=()):
@@ -167,10 +202,6 @@ def create_command(shell_id, command, args=()):
     return envelope
 
 
-def create_script(shell_id, script):
-    pass
-
-
 def cleanup_command(shell_id, command_id):
     """
     Clean-up after a command.
@@ -192,7 +223,6 @@ def cleanup_command(shell_id, command_id):
     envelope.append(body)
 
     return envelope
-
 
 def parse_create_command_response(response):
     root = etree.fromstring(response)
@@ -279,3 +309,12 @@ def parse_command_output(response):
         b"".join(buffer_stdout), b"".join(buffer_stderr),
         return_code, command_done
     )
+
+
+def get_streams(response_document):
+    for stream_node in response_document.findall('.//' + WIN_SHELL + 'Stream'):
+        if stream_node.text:
+            stream_type = stream_node.attrib['Name']
+            yield stream_type,  stream_node.text
+
+
