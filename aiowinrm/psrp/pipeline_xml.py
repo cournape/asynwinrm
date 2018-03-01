@@ -174,6 +174,6 @@ TEMPLATE_NOD = etree.fromstring(PSRP_TEMPLATE)
 
 def get_pipeline_xml(command):
     assert isinstance(command, str)
-    command_nod = TEMPLATE_NOD.findall(".//*[@RefId='13']'")[0]
+    command_nod = TEMPLATE_NOD.findall(".//*[@RefId='13']/MS/S")[0]
     command_nod.text = command
-    return etree.tostring(TEMPLATE_NOD)
+    return etree.tostring(TEMPLATE_NOD, encoding='utf-8').decode('utf-8') + '\r\n'

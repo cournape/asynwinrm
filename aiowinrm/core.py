@@ -17,7 +17,15 @@ from .soap.protocol import (
     create_command, parse_create_command_response, cleanup_command,
     command_output, parse_command_output,
     create_power_shell_payload, get_ps_response, parse_soap_response, get_streams, create_ps_pipeline,
-    parse_create_ps_pipeline_response)
+    create_send_payload, parse_create_shell_response_node)
+
+
+async def _check_response_200_code(resp):
+    if resp.status != 200:
+        await resp.release()
+        raise AIOWinRMException(
+            "Unhandled http error {}".format(resp.status)
+        )
 
 
 class PowerShellContext(object):
@@ -31,41 +39,23 @@ class PowerShellContext(object):
         self.std_out = []
         self.std_err = []
         self.exit_code = None
+        self._win_rm_conection = None
 
     async def __aenter__(self):
         compat_msg = create_session_capability_message(self.session_id)
         runspace_msg = init_runspace_pool_message(self.session_id)
         creation_payload = Fragmenter.messages_to_fragment_bytes((compat_msg, runspace_msg))
 
-        payload = etree.tostring(create_power_shell_payload(self.session_id, creation_payload))
-
-        resp = await _make_winrm_request(
-            self._session, self.host, payload
-        )
-        if resp.status == 401:
-            await resp.release()
-            raise AIOWinRMException(
-                "Unauthorized {}".format(resp.status)
-            )
-        if resp.status != 200:
-            await resp.release()
-            raise AIOWinRMException(
-                "Unhandled http error {}".format(resp.status)
-            )
-
+        payload = create_power_shell_payload(self.session_id, creation_payload)
+        self._win_rm_conection = WinRmConnection(self._session, self.host)
         try:
-            data = await resp.text()
-            self.shell_id = parse_create_shell_response(data)
-
+            response = await self._win_rm_conection.request(payload)
+            self.shell_id = parse_create_shell_response_node(response)
             state = RunspacePoolStateEnum.OPENING
-            get_ps_response_payload = etree.tostring(get_ps_response(self.shell_id))
+            get_ps_response_payload = get_ps_response(self.shell_id)
             while state != RunspacePoolStateEnum.OPENED:
                 print('requesting')
-                keep_ailve_resp = await _make_winrm_request(
-                    self._session, self.host, get_ps_response_payload
-                )
-                data = await keep_ailve_resp.text()
-                response_root = parse_soap_response(data)
+                response_root = await self._win_rm_conection.request(get_ps_response_payload)
                 soap_stream_gen = get_streams(response_root)
                 for soap_stream_type, messages in MessageDefragmenter.streams_to_messages(soap_stream_gen):
                     assert soap_stream_type == 'stdout'
@@ -89,42 +79,43 @@ class PowerShellContext(object):
                                 self.std_err.append(stream.text)
 
             return self
-        finally:
-            await resp.release()
+        except Exception:
+            await self.__aexit__()
+            raise
 
     async def run_script(self, script):
-        script += "\r\nif (!$?) { if($LASTEXITCODE) { exit $LASTEXITCODE } else { exit 1 } }"
-        command_id = uuid.uuid4()
-        message = create_pipeline_message(self.shell_id, command_id, script)
-        for fragment in Fragmenter.messages_to_fragments([message]):
-            if fragment.start_fragment:
-                payload = etree.tostring(create_ps_pipeline(self.shell_id, command_id, fragment.get_bytes()))
-                resp = await _make_winrm_request(
-                    self._session, self.host, payload
-                )
-                if resp.status != 200:
-                    await resp.release()
-                    raise AIOWinRMException(
-                        "Unhandled http error {}".format(resp.status)
-                    )
-                data = await resp.text()
-                command_id = parse_create_command_response(data)
-            else:
-                # TODO
-                await _make_winrm_request(
-                    self._session, self.host, payload
-                )
+        try:
+            script += "\r\nif (!$?) { if($LASTEXITCODE) { exit $LASTEXITCODE } else { exit 1 } }"
+            command_id = uuid.uuid4()
+            message = create_pipeline_message(self.shell_id, command_id, script)
+            for fragment in Fragmenter.messages_to_fragments([message]):
+                if fragment.start_fragment:
+                    payload = create_ps_pipeline(self.shell_id, command_id, fragment.get_bytes())
+                    data = await self._win_rm_conection.request(payload)
+                    command_id = parse_create_command_response(data)
+                else:
+                    payload = create_send_payload(self.shell_id, command_id, fragment.get_bytes())
+                    await self._win_rm_conection.request(payload)
+            return command_id
+        except Exception:
+            await self.__aexit__()
+            raise
+
+    async def get_command_output(self, command_id):
+        payload = command_output(self.shell_id, command_id)
+        data = await self._win_rm_conection.request(payload)
+        print(data)
 
     async def __aexit__(self, *a, **kw):
+        if not self._win_rm_conection:
+            return
         if self.shell_id is None:
+            await self._win_rm_conection.close()
             raise RuntimeError("__aexit__ called without __aenter__")
 
-        payload = etree.tostring(close_shell_payload(self.shell_id, power_shell=True))
-        resp = await _make_winrm_request(self._session, self.host, payload)
-        if resp.status != 200:
-            raise Exception('Expected shell to be closed')
-        # resp_data = await resp.text()
-        await resp.release()
+        payload = close_shell_payload(self.shell_id, power_shell=True)
+        await self._win_rm_conection.request(payload)
+        await self._win_rm_conection.close()
 
 
 class ShellContext(object):
@@ -227,61 +218,37 @@ class CommandContext(object):
             await resp.release()
 
 
-"""
-class ScriptContext(object):
-    def __init__(self, session, host, shell_id, script):
+class WinRmConnection(object):
+    """
+    Class allows to make multiple winrm requests using the same aio connection
+    """
+
+    def __init__(self, session, url):
         self._session = session
+        self._url = url
+        self._resp = None
 
-        self.host = host
-        self.script = script
-
-        self.shell_id = shell_id
-        self.command_id = None
-
-    async def __aenter__(self):
-        payload = etree.tostring(
-            create_script(self.shell_id, script)
-        )
-
-        resp = await _make_winrm_request(self._session, self.host, payload)
-        if resp.status != 200:
-            await resp.release()
+    async def request(self, xml_payload):
+        str_payload = etree.tostring(xml_payload)
+        self._resp = await _make_winrm_request(self._session, self._url, str_payload)
+        data = await self._resp.text()
+        if self._resp.status == 401:
             raise AIOWinRMException(
-                "Unhandled http error {}".format(resp.status)
+                "Unauthorized {}".format(self._resp.status)
             )
 
-        try:
-            data = await resp.text()
-            self.command_id = parse_create_command_response(data)
-            return self
-        finally:
-            await resp.release()
-
-    async def __aexit__(self, *a, **kw):
-        if self.command_id is None:
-            raise RuntimeError("__aexit__ called without __aenter__")
-
-        payload = etree.tostring(cleanup_command(self.shell_id, self.command_id))
-        resp = await _make_winrm_request(self._session, self.host, payload)
-        await resp.release()
-
-    async def _output_request(self):
-        payload = etree.tostring(command_output(self.shell_id, self.command_id))
-        resp = await _make_winrm_request(self._session, self.host, payload)
-        try:
-            if resp.status != 200:
-                raise AIOWinRMException(
-                    "Unhandled http error {}".format(resp.status)
-                )
-
-            data = await resp.text()
-            stdout, stderr, return_code, is_done = parse_command_output(data)
-            return (
-                stdout.decode("utf8"), stderr.decode("utf8"), return_code, is_done
+        root = etree.fromstring(data)  # raises exception if soap response action is a "fault"
+        resp = parse_soap_response(root)
+        if self._resp.status != 200:
+            # probably superflous because we'll have a soap fault anyway
+            raise AIOWinRMException(
+                "Unhandled http error {}".format(self._resp.status)
             )
-        finally:
-            await resp.release()
-"""
+        return resp
+
+    async def close(self):
+        if self._resp:
+            await self._resp.release()
 
 
 def _make_winrm_request(session, url, payload):

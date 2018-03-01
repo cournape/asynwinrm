@@ -9,6 +9,27 @@ from .header import Header
 from .namespaces import NAMESPACE, SOAP_ENV, WIN_SHELL, ADDRESSING
 
 
+class SoapException(Exception):
+    pass
+
+
+class WsManException(Exception):
+    pass
+
+
+def _wrap_envelope(header, body):
+    envelope = etree.Element(SOAP_ENV + "Envelope", nsmap=NAMESPACE)
+    envelope.append(header.to_dom())
+    envelope.append(body)
+    return envelope
+
+
+def _first_node_text(root, ns, tag):
+    lst = root.findall('.//' + ns + tag)
+    if lst:
+        return lst[0].text
+
+
 def create_shell_payload(env=None, cwd=None):
     """ Create the XML payload to create a new shell.
 
@@ -50,11 +71,7 @@ def create_shell_payload(env=None, cwd=None):
         )
         working_directory.text = cwd
 
-    envelope = etree.Element(SOAP_ENV + "Envelope", nsmap=NAMESPACE)
-    envelope.append(header.to_dom())
-    envelope.append(body)
-
-    return envelope
+    return _wrap_envelope(header, body)
 
 
 def create_power_shell_payload(session_id, creation_payload):
@@ -79,16 +96,13 @@ def create_power_shell_payload(session_id, creation_payload):
     creation_xml.text = base64.b64encode(creation_payload)
     creation_xml.set('xmlns', 'http://schemas.microsoft.com/powershell')
 
-    envelope = etree.Element(SOAP_ENV + "Envelope", nsmap=NAMESPACE)
-    envelope.append(header.to_dom())
-    envelope.append(body)
-
-    return envelope
+    return _wrap_envelope(header, body)
 
 
 def create_ps_pipeline(shell_id, pipeline_id, creation_payload):
     assert isinstance(creation_payload, bytes)
     shell_id = str(shell_id).upper()
+    pipeline_id = str(pipeline_id).upper()
     header = Header(
         action='http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Command',
         shell_id=shell_id,
@@ -96,18 +110,14 @@ def create_ps_pipeline(shell_id, pipeline_id, creation_payload):
         timeout="PT60S"
     )
     body = etree.Element(SOAP_ENV + "Body")
-    commandline = etree.SubElement(body, WIN_SHELL + "Commandline")
+    commandline = etree.SubElement(body, WIN_SHELL + "CommandLine")
     commandline.attrib['CommandId'] = pipeline_id
     command = etree.SubElement(commandline, WIN_SHELL + "Command")
     command.text = "Invoke-Expression"
     arguments = etree.SubElement(commandline, WIN_SHELL + "Arguments")
     arguments.text = base64.b64encode(creation_payload)
 
-    envelope = etree.Element(SOAP_ENV + "Envelope", nsmap=NAMESPACE)
-    envelope.append(header.to_dom())
-    envelope.append(body)
-
-    return envelope
+    return _wrap_envelope(header, body)
 
 
 def create_send_payload(shell_id, command_id, send_payload):
@@ -120,10 +130,13 @@ def create_send_payload(shell_id, command_id, send_payload):
         timeout="PT60S"
     )
     body = etree.Element(SOAP_ENV + "Body")
-    stream = etree.SubElement(body, WIN_SHELL + "Stream")
+    send = etree.SubElement(body, WIN_SHELL + "Send")
+    stream = etree.SubElement(send, WIN_SHELL + "Stream")
     stream.text = base64.b64encode(send_payload)
     stream.attrib['Name'] = 'stdin'
     stream.attrib['CommandId'] = command_id
+
+    return _wrap_envelope(header, body)
 
 
 def get_ps_response(shell_id):
@@ -145,11 +158,7 @@ def get_ps_response(shell_id):
     desired_stream = etree.SubElement(receive, WIN_SHELL + "DesiredStream")
     desired_stream.text = "stdout"
 
-    envelope = etree.Element(SOAP_ENV + "Envelope", nsmap=NAMESPACE)
-    envelope.append(header.to_dom())
-    envelope.append(body)
-
-    return envelope
+    return _wrap_envelope(header, body)
 
 
 def close_shell_payload(shell_id, power_shell=False):
@@ -195,11 +204,7 @@ def create_command(shell_id, command, args=()):
         ]
         arguments_node.text = u" ".join(unicode_args)
 
-    envelope = etree.Element(SOAP_ENV + "Envelope", nsmap=NAMESPACE)
-    envelope.append(header.to_dom())
-    envelope.append(body)
-
-    return envelope
+    return _wrap_envelope(header, body)
 
 
 def cleanup_command(shell_id, command_id):
@@ -218,18 +223,24 @@ def cleanup_command(shell_id, command_id):
     code = etree.SubElement(signal, WIN_SHELL + "Code")
     code.text = 'http://schemas.microsoft.com/wbem/wsman/1/windows/shell/signal/terminate'  # NOQA
 
-    envelope = etree.Element(SOAP_ENV + "Envelope", nsmap=NAMESPACE)
-    envelope.append(header.to_dom())
-    envelope.append(body)
+    return _wrap_envelope(header, body)
 
-    return envelope
 
 def parse_create_command_response(response):
     root = etree.fromstring(response)
-    return next(
-        node for node in root.findall('.//*')
-        if node.tag.endswith('CommandId')
-    ).text
+    return _first_node_text(root, WIN_SHELL, 'CommandId')
+
+
+def parse_create_shell_response(response):
+    """
+    TODO remove in favour of parse_create_shell_response_node
+    """
+    root = etree.fromstring(response)
+    return _first_node_text(root, WIN_SHELL, 'ShellId')
+
+
+def parse_create_shell_response_node(root):
+    return _first_node_text(root, WIN_SHELL, 'ShellId')
 
 
 def command_output(shell_id, command_id):
@@ -245,19 +256,18 @@ def command_output(shell_id, command_id):
     )
     desired_stream.text = "stdout stderr"
 
-    envelope = etree.Element(SOAP_ENV + "Envelope", nsmap=NAMESPACE)
-    envelope.append(header.to_dom())
-    envelope.append(body)
-
-    return envelope
+    return _wrap_envelope(header, body)
 
 
-def parse_soap_response(response):
-    root = etree.fromstring(response)
+def parse_soap_response(root):
     action = root.find(SOAP_ENV + "Header/" + ADDRESSING + "Action")
     if action is not None and action.text.endswith('fault'):
         fault = root.find(SOAP_ENV + "Body/" + SOAP_ENV + "Fault/" + SOAP_ENV + "Reason/" + SOAP_ENV + "Text")
-        raise Exception(fault.text)
+        if fault is not None and fault.text:
+            raise SoapException(fault.text)
+        provider_fault = root.find('.//{http://schemas.microsoft.com/wbem/wsman/1/wsmanfault}ProviderFault')
+        if provider_fault is not None and provider_fault.text:
+            raise WsManException(provider_fault.text)
     return root
 
 
