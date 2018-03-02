@@ -82,7 +82,7 @@ async def run_cmd(host,
                 stdout_buffer, stderr_buffer = [], []
                 is_done = False
                 while not is_done:
-                    stdout, stderr, return_code, is_done = await command_context._output_request()
+                    stdout, stderr, return_code, is_done = await command_context.output_request()
                     stdout_buffer.append(stdout)
                     stderr_buffer.append(stderr)
                 return ''.join(stdout_buffer), ''.join(stderr_buffer), return_code
@@ -118,7 +118,6 @@ async def run_ps(host,
         # readable
         stderr = _clean_error_msg(stderr)
     return stdout, stderr, return_code
-
 
 
 async def run_psrp(host,

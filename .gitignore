@@ -2,3 +2,4 @@
 aiowinrm/_version.py
 .coverage
 aiowinrm/.DS_Store
+aiowinrm/xml/*

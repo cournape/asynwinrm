@@ -3,9 +3,10 @@ import base64
 import six
 
 import lxml.etree as etree
+from aiowinrm.errors import SoapTimeout, SoapException, WsManException
 
 from .header import Header
-from .namespaces import NAMESPACE, SOAP_ENV, WIN_SHELL, ADDRESSING
+from .namespaces import NAMESPACE, SOAP_ENV, WIN_SHELL, ADDRESSING, WSMAN_FAULT
 
 
 PS_NAMESPACE_URI = 'http://schemas.microsoft.com/powershell'
@@ -18,19 +19,6 @@ SEND_URI = 'http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Send'
 RECEIVE_URI = 'http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Receive'
 DELETE_URI = 'http://schemas.xmlsoap.org/ws/2004/09/transfer/Delete'
 DONE_URI = 'http://schemas.microsoft.com/wbem/wsman/1/windows/shell/CommandState/Done'
-
-
-
-class SoapException(Exception):
-    pass
-
-
-class SoapTimeout(SoapException):
-    pass
-
-
-class WsManException(Exception):
-    pass
 
 
 def _wrap_envelope(header, body):
@@ -280,7 +268,7 @@ def create_command(shell_id, command, args=()):
 
 def cleanup_command(shell_id, command_id):
     """
-    builds Soap message to Clean-up after a command.
+    builds SOAP message to Clean-up after a command.
     """
     header = Header(
         action=SIGNAL_URI,
@@ -307,15 +295,7 @@ def parse_create_command_response(response_node):
     return _first_node_text(response_node, WIN_SHELL, 'CommandId')
 
 
-def parse_create_shell_response(response):
-    """
-    TODO remove in favour of parse_create_shell_response_node
-    """
-    root = etree.fromstring(response)
-    return _first_node_text(root, WIN_SHELL, 'ShellId')
-
-
-def parse_create_shell_response_node(root):
+def parse_create_shell_response(root):
     """
     Extracts shell_id
 
@@ -327,7 +307,7 @@ def parse_create_shell_response_node(root):
 
 def command_output(shell_id, command_id, power_shell=False):
     """
-    Soap message for retrieving the command output
+    SOAP message for retrieving the command output
 
     :param shell_id:
     :param command_id:
@@ -371,21 +351,14 @@ def parse_soap_response(root):
                 raise SoapTimeout(fault.text)
             else:
                 raise SoapException(fault.text)
-        provider_fault = root.find('.//{http://schemas.microsoft.com/wbem/wsman/1/wsmanfault}ProviderFault')
+        provider_fault = root.find('.//' + WSMAN_FAULT + 'ProviderFault')
         if provider_fault is not None and provider_fault.text:
             raise WsManException(provider_fault.text)
     return root
 
 
-def parse_command_output(response):
-    if isinstance(response, str):
-        root = etree.fromstring(response)
-    else:
-        root = response
-    stream_nodes = [
-        node for node in root.findall('.//*')
-        if node.tag.endswith('Stream')
-    ]
+def parse_command_output(root):
+    stream_nodes = root.findall('.//' + WIN_SHELL + 'Stream')
 
     buffer_stdout = []
     buffer_stderr = []
@@ -436,6 +409,6 @@ def get_streams(response_document):
     for stream_node in response_document.findall('.//' + WIN_SHELL + 'Stream'):
         if stream_node.text:
             stream_type = stream_node.attrib['Name']
-            yield stream_type,  stream_node.text
+            yield stream_type, stream_node.text
 
 

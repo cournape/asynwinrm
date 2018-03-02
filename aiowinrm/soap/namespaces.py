@@ -30,5 +30,7 @@ WSMAN_DMTF = "{%s}" % (NS_WSMAN_DMTF,)
 WSMAN_MSFT = "{%s}" % (NS_WSMAN_MSFT,)
 ADDRESSING = "{%s}" % (NS_ADDRESSING,)
 WIN_SHELL = "{%s}" % (NS_WIN_SHELL,)
+WSMAN_FAULT = "{%s}" % (NS_WSMAN_FAULT,)
+
 
 XML = "{%s}"  % (NS_XML,)
