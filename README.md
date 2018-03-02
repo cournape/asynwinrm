@@ -4,9 +4,9 @@ aio-winrm is licensed under the APACHE 2.0 license.
 
 Python 3.5+ library implementing the WinRM protocol on top of asyncio.
 
-The original repository can be found [here](https://github.com/cournape/aio-winrm)
-I've opend a [pull request](https://github.com/cournape/aio-winrm/pull/2) but the original author is probably busy
-The sync api might need some love, but I'd recommend using [pyWinRm](https://github.com/diyan/pywinrm) in stead
+The original repository can be found [here](https://github.com/cournape/aio-winrm).
+I've opend a [pull request](https://github.com/cournape/aio-winrm/pull/2) but the original author is probably busy.
+The sync api might need some love, but I'd recommend using [pyWinRm](https://github.com/diyan/pywinrm) in stead.
 
 ## New in this fork:
  - SSL support
