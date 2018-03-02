@@ -58,8 +58,7 @@ class Header:
             max_envelop_size = etree.SubElement(
                 header, WSMAN_DMTF + "MaxEnvelopeSize", mustUnderstand="true"
             )
-            max_envelop_size.text = str(self.max_envelop_size)
-
+            max_envelop_size.text = str(self.max_envelope_size)
         message_id = etree.SubElement(header, ADDRESSING + "MessageID")
         message_id.text = "uuid:{}".format(str(self.id))
 

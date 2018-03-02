@@ -17,7 +17,7 @@ from .soap.protocol import (
     create_command, parse_create_command_response, cleanup_command,
     command_output, parse_command_output,
     create_power_shell_payload, get_ps_response, parse_soap_response, get_streams, create_ps_pipeline,
-    create_send_payload, parse_create_shell_response_node)
+    create_send_payload, parse_create_shell_response_node, SoapTimeout)
 
 
 async def _check_response_200_code(resp):
@@ -35,24 +35,28 @@ class PowerShellContext(object):
 
         self.host = host
         self.session_id = uuid.uuid4()
+        self.runspace_id = uuid.uuid4()
+        self.shell_id = None
 
         self.std_out = []
         self.std_err = []
         self.exit_code = None
         self._win_rm_conection = None
+        self._shell_timed_out = False
 
     async def __aenter__(self):
-        compat_msg = create_session_capability_message(self.session_id)
-        runspace_msg = init_runspace_pool_message(self.session_id)
+        compat_msg = create_session_capability_message(self.runspace_id)
+        runspace_msg = init_runspace_pool_message(self.runspace_id)
         creation_payload = Fragmenter.messages_to_fragment_bytes((compat_msg, runspace_msg))
 
-        payload = create_power_shell_payload(self.session_id, creation_payload)
+        payload = create_power_shell_payload(self.runspace_id, self.session_id, creation_payload)
         self._win_rm_conection = WinRmConnection(self._session, self.host)
         try:
             response = await self._win_rm_conection.request(payload)
             self.shell_id = parse_create_shell_response_node(response)
+            # assert self.shell_id == self.runspace_id
             state = RunspacePoolStateEnum.OPENING
-            get_ps_response_payload = get_ps_response(self.shell_id)
+            get_ps_response_payload = get_ps_response(self.shell_id, self.session_id)
             while state != RunspacePoolStateEnum.OPENED:
                 print('requesting')
                 response_root = await self._win_rm_conection.request(get_ps_response_payload)
@@ -79,42 +83,47 @@ class PowerShellContext(object):
                                 self.std_err.append(stream.text)
 
             return self
-        except Exception:
-            await self.__aexit__()
+        except Exception as ex:
+            await self.__aexit__(ex=ex)
             raise
 
-    async def run_script(self, script):
+    async def start_script(self, script):
         try:
             script += "\r\nif (!$?) { if($LASTEXITCODE) { exit $LASTEXITCODE } else { exit 1 } }"
             command_id = uuid.uuid4()
-            message = create_pipeline_message(self.shell_id, command_id, script)
+            message = create_pipeline_message(self.runspace_id, command_id, script)
+            # print(message)
             for fragment in Fragmenter.messages_to_fragments([message]):
                 if fragment.start_fragment:
-                    payload = create_ps_pipeline(self.shell_id, command_id, fragment.get_bytes())
+                    payload = create_ps_pipeline(self.shell_id, self.session_id, command_id, fragment.get_bytes())
+                    print(etree.tostring(payload, pretty_print=True).decode('utf-8'))
                     data = await self._win_rm_conection.request(payload)
                     command_id = parse_create_command_response(data)
                 else:
-                    payload = create_send_payload(self.shell_id, command_id, fragment.get_bytes())
+                    payload = create_send_payload(self.shell_id, self.session_id, command_id, fragment.get_bytes())
                     await self._win_rm_conection.request(payload)
             return command_id
-        except Exception:
-            await self.__aexit__()
+        except Exception as ex:
+            await self.__aexit__(ex=ex)
             raise
 
     async def get_command_output(self, command_id):
-        payload = command_output(self.shell_id, command_id)
+        payload = command_output(self.shell_id, command_id, power_shell=True)
         data = await self._win_rm_conection.request(payload)
-        print(data)
+        parsed = parse_command_output(data)
+        return None, None, 1
 
-    async def __aexit__(self, *a, **kw):
+
+    async def __aexit__(self, ex=None, *a, **kw):
         if not self._win_rm_conection:
             return
-        if self.shell_id is None:
+        if self.shell_id is None and ex is None:
             await self._win_rm_conection.close()
             raise RuntimeError("__aexit__ called without __aenter__")
 
-        payload = close_shell_payload(self.shell_id, power_shell=True)
-        await self._win_rm_conection.request(payload)
+        if isinstance(ex, SoapTimeout):
+            payload = close_shell_payload(self.shell_id, power_shell=True)
+            await self._win_rm_conection.request(payload)
         await self._win_rm_conection.close()
 
 

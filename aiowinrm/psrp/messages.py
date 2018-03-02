@@ -80,6 +80,7 @@ def init_runspace_pool_message(runspace_id):
 
 
 def create_pipeline_message(runspace_id, pipeline_id, script):
+    # with open()
     return Message(runspace_id,
                    message_type='create_pipeline',
                    data=get_pipeline_xml(script),

@@ -10,6 +10,7 @@ from aiowinrm.utils import parse_host
 import xml.etree.ElementTree as ET
 
 
+BOM_CHR = chr(65279)
 STRIP_RE = re.compile("xmlns=*[\"\"][^\"\"]*[\"\"]")
 
 
@@ -102,8 +103,8 @@ async def run_ps(host,
     :param verify_ssl:
     :return:
     """
-    if chr(65279) in script:
-        pos = script.index(chr(65279))
+    if BOM_CHR in script:
+        pos = script.index(BOM_CHR)
         raise Exception('Illegal character found in script at position {}'.format(pos))
     encoded_ps = b64encode(script.encode('utf_16_le')).decode('ascii')
     res = await run_cmd(host=host,
@@ -135,8 +136,8 @@ async def run_psrp(host,
     :param verify_ssl:
     :return:
     """
-    if chr(65279) in script:
-        pos = script.index(chr(65279))
+    if BOM_CHR in script:
+        pos = script.index(BOM_CHR)
         raise Exception('Illegal character found in script at position {}'.format(pos))
 
     host = parse_host(host, default_transport=default_transport)
@@ -144,5 +145,8 @@ async def run_psrp(host,
                                      verify_ssl=verify_ssl)
     async with aiohttp.ClientSession(auth=auth, connector=connector) as session:
         async with PowerShellContext(session, host) as pwr_shell_context:
-            res = await pwr_shell_context.run_script(script)
-            stdout, stderr, return_code = res
+            command_id = await pwr_shell_context.start_script(script)
+            exit_code = None
+            while exit_code is None:
+                res = await pwr_shell_context.get_command_output(command_id)
+                std_in, std_out, exit_code = res
