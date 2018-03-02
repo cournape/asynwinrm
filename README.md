@@ -21,11 +21,11 @@ His blog post on PSRP is a good read: [A look under the hood at Powershell Remot
 
 Why not [pyWinRm](https://github.com/diyan/pywinrm):
 
-I needed something async to do lots of requests at the same time.
+- I needed something async to do lots of requests at the same time.
 
 Why not [txwinrm](https://github.com/zenoss/txwinrm):
 
-Our project is moving away from twisted and towards asyncio where possible.
+- Our project is moving away from twisted and towards asyncio where possible.
 
 
 ## PSRP
