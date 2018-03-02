@@ -1,3 +1,5 @@
+from aiowinrm.winrm_connection import WinRmConnection
+
 from .soap.protocol import (
     create_shell_payload, close_shell_payload, parse_create_shell_response
 )
@@ -17,6 +19,7 @@ class ShellContext(object):
     async def __aenter__(self):
         try:
             payload = create_shell_payload(self.env, self.cwd)
+            self._win_rm_connection = WinRmConnection(self._session, self.host)
             resp = await self._win_rm_connection.request(payload)
             self.shell_id = parse_create_shell_response(resp)
             return self
