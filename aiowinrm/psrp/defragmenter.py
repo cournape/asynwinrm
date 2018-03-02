@@ -89,4 +89,5 @@ class MessageDefragmenter(object):
                 stream_messages[stream_type].append(decoded)
 
         for stream_type, messages in stream_messages.items():
-            yield stream_type, messages
+            if messages:
+                yield stream_type, [message for message in messages if message]

@@ -1,10 +1,8 @@
 from aiowinrm.winrm_connection import WinRmConnection
 
-from .soap.protocol import (
-    create_shell_payload, close_shell_payload, parse_create_shell_response,
-    create_command, parse_create_command_response, cleanup_command,
-    command_output, parse_command_output, SoapTimeout)
-
+from .soap.protocol import \
+    create_command, parse_create_command_response, cleanup_command, \
+    command_output, parse_command_output, SoapTimeout
 
 
 class CommandContext(object):

@@ -113,7 +113,11 @@ def create_power_shell_payload(shell_id, session_id, creation_payload):
     return _wrap_envelope(header, body)
 
 
-def create_ps_pipeline(shell_id, session_id, pipeline_id, creation_payload, max_envelope_size=153600):
+def create_ps_pipeline(shell_id,
+                       session_id,
+                       pipeline_id,
+                       creation_payload,
+                       max_envelope_size=153600):
     """
     creates a SOAP message to create a powershell pipeline
     After opening a powershell session we can create "pipelines" which we use to run ps scripts
@@ -357,12 +361,31 @@ def parse_soap_response(root):
     return root
 
 
+def parse_command_done(root):
+    # The CommandState will change from Running to Done like so:
+    # @example
+    #   from...
+    #   <rsp:CommandState CommandId="..." #   State="http://schemas.microsoft.com/wbem/wsman/1/windows/shell/CommandState/Running"/>  # NOQA
+    #   to...
+    #   <rsp:CommandState CommandId="..." #   State="http://schemas.microsoft.com/wbem/wsman/1/windows/shell/CommandState/Done"> #   # NOQA
+    #     <rsp:ExitCode>0</rsp:ExitCode>
+    #   </rsp:CommandState>
+
+    return_code = None
+    command_state_node = root.find('.//' + WIN_SHELL + 'CommandState')
+    if command_state_node is None:
+        return False, None
+    command_done = command_state_node.attrib['State'] == DONE_URI
+    if command_done:
+        return_code = int(root.find('.//' + WIN_SHELL + 'ExitCode').text)
+    return command_done, return_code
+
+
 def parse_command_output(root):
     stream_nodes = root.findall('.//' + WIN_SHELL + 'Stream')
 
     buffer_stdout = []
     buffer_stderr = []
-    return_code = None
 
     for stream_node in stream_nodes:
         if not stream_node.text:
@@ -377,18 +400,7 @@ def parse_command_output(root):
             )
 
     # We may need to get additional output if the stream has not finished.
-    # The CommandState will change from Running to Done like so:
-    # @example
-    #   from...
-    #   <rsp:CommandState CommandId="..." #   State="http://schemas.microsoft.com/wbem/wsman/1/windows/shell/CommandState/Running"/>  # NOQA
-    #   to...
-    #   <rsp:CommandState CommandId="..." #   State="http://schemas.microsoft.com/wbem/wsman/1/windows/shell/CommandState/Done"> #   # NOQA
-    #     <rsp:ExitCode>0</rsp:ExitCode>
-    #   </rsp:CommandState>
-    command_state_node = root.find('.//' + WIN_SHELL + 'CommandState')
-    command_done = command_state_node.attrib['State'] == DONE_URI
-    if command_done:
-        return_code = int(root.find('.//' + WIN_SHELL + 'ExitCode').text)
+    command_done, return_code = parse_command_done(root)
 
     return (
         b''.join(buffer_stdout),

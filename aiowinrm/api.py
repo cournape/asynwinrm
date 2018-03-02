@@ -4,8 +4,10 @@ from base64 import b64encode
 import aiohttp
 import asyncio
 
+from aiowinrm.command_context import CommandContext
 from aiowinrm.constants import TranportKind
-from aiowinrm.core import PowerShellContext, ShellContext, CommandContext
+from aiowinrm.ps_context import PowerShellContext
+from aiowinrm.shell_context import ShellContext
 from aiowinrm.utils import parse_host
 import xml.etree.ElementTree as ET
 
@@ -142,10 +144,15 @@ async def run_psrp(host,
     host = parse_host(host, default_transport=default_transport)
     connector = aiohttp.TCPConnector(loop=asyncio.get_event_loop(),
                                      verify_ssl=verify_ssl)
+
     async with aiohttp.ClientSession(auth=auth, connector=connector) as session:
         async with PowerShellContext(session, host) as pwr_shell_context:
+            stdout_buffer, stderr_buffer = [], []
             command_id = await pwr_shell_context.start_script(script)
             exit_code = None
             while exit_code is None:
                 res = await pwr_shell_context.get_command_output(command_id)
-                std_in, std_out, exit_code = res
+                std_out, std_err, exit_code = res
+                stdout_buffer.append(std_out)
+                stderr_buffer.append(std_err)
+        return ''.join(stdout_buffer), ''.join(stderr_buffer), exit_code

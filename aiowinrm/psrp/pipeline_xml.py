@@ -172,9 +172,8 @@ PSRP_TEMPLATE = """
 
 TEMPLATE_NOD = etree.fromstring(PSRP_TEMPLATE)
 
+
 def get_pipeline_xml(command):
-    with open('/Users/sjuul/workspace/aio-winrm/aiowinrm/pipeline_contents.xml', 'r') as fl:
-        return fl.read()
     assert isinstance(command, str)
     command_nod = TEMPLATE_NOD.findall(".//*[@RefId='13']/MS/S")[0]
     command_nod.text = command

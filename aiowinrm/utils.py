@@ -1,4 +1,5 @@
 import re
+import lxml.etree as etree
 
 from .constants import TranportKind
 
@@ -36,3 +37,11 @@ def parse_host(url, default_transport):
     if not path:
         path = 'wsman'
     return '{0}://{1}:{2}/{3}'.format(scheme, host, port, path.lstrip('/'))
+
+
+REMOVE_BLANKS_PARSER = etree.XMLParser(remove_blank_text=True)
+
+
+def xml_remove_spaces(inp):
+    root = etree.fromstring(inp, parser=REMOVE_BLANKS_PARSER)
+    return etree.tostring(root).decode('utf-8') + '\r\n'
