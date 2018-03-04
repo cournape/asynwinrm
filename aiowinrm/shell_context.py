@@ -6,20 +6,18 @@ from .soap.protocol import (
 
 
 class ShellContext(object):
-    def __init__(self, session, host, env=None, cwd=None):
-        self._session = session
-        self.host = host
-
+    def __init__(self, connection_options, env=None, cwd=None):
         self.env = env
         self.cwd = cwd
 
         self.shell_id = None
+        self._connection_options = connection_options
         self._win_rm_connection = None
 
     async def __aenter__(self):
         try:
             payload = create_shell_payload(self.env, self.cwd)
-            self._win_rm_connection = WinRmConnection(self._session, self.host)
+            self._win_rm_connection = WinRmConnection(self._connection_options)
             resp = await self._win_rm_connection.request(payload)
             self.shell_id = parse_create_shell_response(resp)
             return self
@@ -36,3 +34,8 @@ class ShellContext(object):
 
         payload = close_shell_payload(self.shell_id)
         await self._win_rm_connection.request(payload)
+        await self._win_rm_connection.close()
+
+    @property
+    def win_rm_connection(self):
+        return self._win_rm_connection

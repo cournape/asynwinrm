@@ -6,4 +6,5 @@ except ImportError:
     version = "0.0.0.dev0"
 
 from .api import run_cmd, run_ps, run_psrp
-
+from .winrm_connection import ConnectionOptions, WinRmConnection
+from .utils import build_win_rm_url

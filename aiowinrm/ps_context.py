@@ -18,10 +18,9 @@ EXIT_CODE_CODE = "\r\nif (!$?) { if($LASTEXITCODE) { exit $LASTEXITCODE } else {
 
 class PowerShellContext(object):
 
-    def __init__(self, session, host):
-        self._session = session
+    def __init__(self, connection_options):
+        self._connection_options = connection_options
 
-        self.host = host
         self.session_id = uuid.uuid4()
         self.runspace_id = uuid.uuid4()
         self.shell_id = None
@@ -47,7 +46,7 @@ class PowerShellContext(object):
     async def __aenter__(self):
         try:
             payload = create_power_shell_payload(self.runspace_id, self.session_id, self._creation_payload)
-            self._win_rm_connection = WinRmConnection(self._session, self.host)
+            self._win_rm_connection = WinRmConnection(self._connection_options)
             response = await self._win_rm_connection.request(payload)
             self.shell_id = parse_create_shell_response(response)
 

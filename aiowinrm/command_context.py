@@ -1,3 +1,4 @@
+from aiowinrm.shell_context import ShellContext
 from aiowinrm.winrm_connection import WinRmConnection
 
 from .soap.protocol import \
@@ -6,21 +7,30 @@ from .soap.protocol import \
 
 
 class CommandContext(object):
-    def __init__(self, session, host, shell_id, command, args=()):
-        self._session = session
-
-        self.host = host
+    def __init__(self,
+                 shell_context,
+                 command,
+                 args=()):
+        assert isinstance(shell_context, ShellContext)
         self.command = command
         self.args = args
+        self.shell_context = shell_context
 
-        self.shell_id = shell_id
         self.command_id = None
-        self._win_rm_connection = None
+
+    @property
+    def _win_rm_connection(self):
+        return self.shell_context.win_rm_connection
+
+    @property
+    def shell_id(self):
+        return self.shell_context.shell_id
 
     async def __aenter__(self):
         try:
-            payload = create_command(self.shell_id, self.command, self.args)
-            self._win_rm_connection = WinRmConnection(self._session, self.host)
+            payload = create_command(self.shell_id,
+                                     self.command,
+                                     self.args)
             resp = await self._win_rm_connection.request(payload)
             self.command_id = parse_create_command_response(resp)
 
@@ -34,14 +44,11 @@ class CommandContext(object):
             return
 
         if self.command_id is None and ex is None:
-            await self._win_rm_connection.close()
             raise RuntimeError("__aexit__ called without __aenter__")
 
-        if isinstance(ex, SoapTimeout):
+        if not isinstance(ex, SoapTimeout):
             payload = cleanup_command(self.shell_id, self.command_id)
             await self._win_rm_connection.request(payload)
-
-        await self._win_rm_connection.close()
 
     async def output_request(self):
         try:
