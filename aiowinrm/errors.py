@@ -15,3 +15,14 @@ class SoapTimeout(SoapException):
 class WsManException(Exception):
     pass
 
+
+class InvalidCredentialsError(Exception):
+    pass
+
+
+class UnsupportedAuthArgument(Warning):
+    pass
+
+
+class AIOWinRMTransportError(Exception):
+    pass

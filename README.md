@@ -79,3 +79,9 @@ if __name__ == '__main__':
     loop.run_until_complete(coro)
     loop.close()
 ```
+
+Kerberos:
+
+```
+docker build . -t aiowinrm --add-host=multiserver:172.31.254.167
+```

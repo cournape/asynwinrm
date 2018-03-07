@@ -1,68 +1,8 @@
-import asyncio
-from enum import Enum
-
-import aiohttp
 import lxml.etree as etree
-from aiowinrm.errors import AIOWinRMException
+
+from aiowinrm.sec.auto_session import AutoSession
+from aiowinrm.errors import AIOWinRMException, InvalidCredentialsError
 from aiowinrm.soap.protocol import parse_soap_response
-from aiowinrm.utils import check_url
-
-
-class AuthEnum(Enum):
-
-    Basic = 'basic'
-    NTLM = 'ntlm'
-
-
-class ConnectionOptions(object):
-
-    def __init__(self,
-                 winrm_url,
-                 username,
-                 password,
-                 domain=None,
-                 auth_mode=AuthEnum.Basic,
-                 verify_ssl=True,
-                 default_to_ssl=True,
-                 connector=None,
-                 loop=None):
-        self.verify_ssl = verify_ssl
-        self.loop = asyncio.get_event_loop() \
-            if loop is None else loop
-        self._connector = connector
-        self.url = check_url(winrm_url, default_to_ssl)
-        self.domain = domain
-        self.username = username
-        self.password = password
-        self.auth_mode = auth_mode
-
-    @property
-    def connector(self):
-        if self._connector is None:
-            return aiohttp.TCPConnector(loop=self.loop,
-                                        verify_ssl=self.verify_ssl)
-
-
-class NtlmSession(aiohttp.ClientSession):
-
-    def __init__(self,
-                 domain,
-                 username,
-                 password,
-                 connector,
-                 loop):
-        self._domain = domain
-        self._username = username
-        self._password = password
-        super(NtlmSession, self).__init__(connector=connector,
-                                          loop=loop)
-
-    def post(self, url, *, data=None, **kwargs):
-
-        super(NtlmSession, self).post(url=url,
-                                      data=data,
-                                      headers=None,
-                                      **kwargs)
 
 
 class WinRmConnection(object):
@@ -72,68 +12,63 @@ class WinRmConnection(object):
 
     def __init__(self, options):
         self.options = options
-
         self._session = None
-        self._resp = None
 
     @property
     def session(self):
         if self._session is None:
-            if self.options.auth_mode == AuthEnum.Basic:
-                self._session = self.build_basic_auth_session()
-            elif self.options.auth_mode == AuthEnum.NTLM:
-                self._session = self.build_ntlm_auth_session()
-            else:
-                raise Exception('Unknown auth mode')
+            self._session = self.build_session()
+
         return self._session
 
-    def build_ntlm_auth_session(self):
-        return NtlmSession(
-            domain=self.options.domain,
+    def build_session(self):
+        return AutoSession(
+            endpoint=self.options.url,
+            realm=self.options.realm,
             username=self.options.username,
             password=self.options.password,
             connector=self.options.connector,
-            loop=self.options.loop)
-
-    def build_basic_auth_session(self):
-        user = f'{self.options.username}@{self.options.domain}' \
-            if self.options.domain else self.options.username
-        auth = aiohttp.BasicAuth(user, self.options.password)
-        return aiohttp.ClientSession(
-            connector=self.options.connector,
             loop=self.options.loop,
-            auth=auth)
+            verify_ssl=self.options.verify_ssl,
+            ca_trust_path=self.options.ca_trust_path,
+            cert_pem=self.options.cert_pem,
+            cert_key_pem=self.options.cert_key_pem,
+            read_timeout_sec=self.options.read_timeout_sec,
+            kerberos_delegation=self.options.kerberos_delegation,
+            kerberos_hostname_override=self.options.kerberos_hostname_override,
+            auth_method=self.options.auth_method,
+            message_encryption=self.options.message_encryption,
+            credssp_disable_tlsv1_2=self.options.credssp_disable_tlsv1_2,
+            send_cbt=self.options.send_cbt,
+            keytab=self.options.keytab,
+        )
+
 
     async def request(self, xml_payload):
         payload_bytes = etree.tostring(xml_payload)
 
-        headers = {
-            'Content-Type': 'application/soap+xml; charset=utf-8',
-            'Content-Length': str(len(payload_bytes)),
-        }
+        resp = await self.session.winrm_request(self.options.url,
+                                                data=payload_bytes)
 
-        self._resp = await self.session.post(self.options.url,
-                                             data=payload_bytes,
-                                             headers=headers)
-        data = await self._resp.text()
-        if self._resp.status == 401:
+        if resp.text:
+            root = etree.fromstring(resp.text)
+
+            # raises exception if soap response action is a "fault"
+            parsed = parse_soap_response(root)
+            if resp.status != 200:
+                # probably superfluous because we'll have a soap fault anyway
+                raise AIOWinRMException(
+                    f'Unhandled http error {resp.status}'
+                )
+            return parsed
+
+        if resp.status != 200:
             raise AIOWinRMException(
-                "Unauthorized {}".format(self._resp.status)
+                f'Unhandled http error {resp.status}'
             )
 
-        root = etree.fromstring(data)
-
-        # raises exception if soap response action is a "fault"
-        resp = parse_soap_response(root)
-        if self._resp.status != 200:
-
-            # probably superfluous because we'll have a soap fault anyway
-            raise AIOWinRMException(
-                "Unhandled http error {}".format(self._resp.status)
-            )
-        return resp
+        raise RuntimeError('200 code but no data received')
 
     async def close(self):
-        if self._resp:
-            await self._resp.release()
-        self._session.close()
+        if self._session:
+            await self._session.close()
