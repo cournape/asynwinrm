@@ -81,25 +81,24 @@ class Encryption(object):
 
         headers = {
             'Content-Length': str(len(encrypted_message)),
-            'Content-Type': f'{content_type};protocol="{self.protocol_string.decode()}";boundary="Encrypted Boundary"'
+            'Content-Type': f'{content_type};protocol="{self.protocol_string.decode()}";boundary="Encrypted Boundary"',
+            'Connection': 'keep-alife'
         }
         return PreparedRequest(url=endpoint, data=encrypted_message, headers=headers)
 
-    def parse_encrypted_response(self, response):
+    async def parse_encrypted_response(self, response):
         """
         Takes in the encrypted response from the server and decrypts it
 
         :param response: The response that needs to be decrytped
         :return: The unencrypted message from the server
         """
-        if 'Content-Type' not in response.headers:
-            print('Here')
         content_type = response.headers['Content-Type']
         if 'protocol="{0}"'.format(self.protocol_string.decode()) in content_type:
-            host = urlsplit(response.url).hostname
-            msg = self._decrypt_response(response, host)
+            msg = self._decrypt_response(response, response.host)
+            response.set_content(msg)
         else:
-            msg = response.text
+            msg = response.content
 
         return msg
 

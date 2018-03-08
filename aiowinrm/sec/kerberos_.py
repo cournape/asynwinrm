@@ -1,8 +1,9 @@
+from urllib.parse import urlparse
+
 import aiohttp
 from aiohttp import CookieJar
 
 from aiowinrm.case_insensitive_dict import CaseInsensitiveDict
-from aiowinrm.sec.prepared_request import ResponseWrapper
 
 try:
     import kerberos
@@ -16,8 +17,6 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import UnsupportedAlgorithm
-from urllib.parse import urlparse
-
 
 
 class MutualAuthenticationError(Exception):
@@ -25,7 +24,6 @@ class MutualAuthenticationError(Exception):
 
 class KerberosExchangeError(Exception):
     """Kerberos Exchange Failed Error"""
-
 
 
 log = logging.getLogger(__name__)
@@ -49,37 +47,9 @@ DISABLED = 3
 class NoCertificateRetrievedWarning(Warning):
     pass
 
+
 class UnknownSignatureAlgorithmOID(Warning):
     pass
-
-
-class SanitizedResponse(aiohttp.ClientResponse):
-    """The :class:`Response <Response>` object, which contains a server's
-    response to an HTTP request.
-
-    This differs from `requests.models.Response` in that it's headers and
-    content have been sanitized. This is only used for HTTP Error messages
-    which do not support mutual authentication when mutual authentication is
-    required."""
-
-    def __init__(self, response):
-        super(SanitizedResponse, self).__init__()
-        self.status = response.status
-        self.encoding = response.encoding
-        self.raw = response.raw
-        self.reason = response.reason
-        self.url = response.url
-        self.request = response.request
-        self.connection = response.connection
-        self._content_consumed = True
-
-        self._content = ""
-        self.cookies = CookieJar()
-        self.headers = CaseInsensitiveDict()
-        self.headers['content-length'] = '0'
-        for header in ('date', 'server'):
-            if header in response.headers:
-                self.headers[header] = response.headers[header]
 
 
 def _negotiate_value(response):
@@ -142,19 +112,9 @@ def _get_channel_bindings_application_data(response):
     """
 
     application_data = None
-
-    assert isinstance(response, ResponseWrapper)
-    if response.server_cert is None:
-        warnings.warn("Failed to get raw socket for CBT; has aiohttp impl changed",
-                      NoCertificateRetrievedWarning)
-    else:
-        try:
-            server_certificate = response.server_cert
-        except AttributeError:
-            pass
-        else:
-            certificate_hash = _get_certificate_hash(server_certificate)
-            application_data = b'tls-server-end-point:' + certificate_hash
+    if response.peer_cert is not None:
+        certificate_hash = _get_certificate_hash(response.peer_cert)
+        application_data = b'tls-server-end-point:' + certificate_hash
     return application_data
 
 
@@ -191,7 +151,6 @@ class HTTPKerberosAuth(object):
         with failure detail.
 
         """
-
         # Flags used by kerberos module.
         gssflags = kerberos.GSS_C_MUTUAL_FLAG | kerberos.GSS_C_SEQUENCE_FLAG
         if self.delegate:
@@ -252,10 +211,8 @@ class HTTPKerberosAuth(object):
     async def authenticate_user(self, response, **kwargs):
         """Handles user authentication with gssapi/kerberos"""
 
-        host = urlparse(response.url).hostname
-
         try:
-            auth_header = self.generate_request_header(response, host)
+            auth_header = self.generate_request_header(response, response.host)
         except KerberosExchangeError:
             # GSS Failure, return existing response
             return response
@@ -316,7 +273,7 @@ class HTTPKerberosAuth(object):
 
                 if(self.mutual_authentication == REQUIRED and
                        self.sanitize_mutual_error_response):
-                    return SanitizedResponse(response)
+                    return response
                 else:
                     return response
             else:
@@ -340,7 +297,7 @@ class HTTPKerberosAuth(object):
         log.debug("authenticate_server(): Authenticate header: {0}".format(
             _negotiate_value(response)))
 
-        host = urlparse(response.url).hostname
+        host = response.host
 
         try:
             # If this is set pass along the struct to Kerberos

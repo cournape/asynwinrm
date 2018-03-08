@@ -10,7 +10,7 @@ import aiohttp
 from aiowinrm.case_insensitive_dict import CaseInsensitiveDict
 from aiowinrm.sec.encryption import Encryption
 from aiowinrm.errors import InvalidCredentialsError, AIOWinRMException, AIOWinRMTransportError
-from aiowinrm.sec.prepared_request import PreparedRequest, ResponseWrapper, WrappedResponseClass, WrappedRequestClass
+from aiowinrm.sec.prepared_request import PreparedRequest, WrappedResponseClass, WrappedRequestClass
 
 is_py2 = sys.version[0] == '2'
 
@@ -227,16 +227,18 @@ class AutoSession(aiohttp.ClientSession):
     async def _send_message_request(self, prepared_request):
         # handle other codes in application
         assert isinstance(prepared_request, PreparedRequest)
-        assert 'Connection' in prepared_request.headers
-        response = await self.post(url=prepared_request.url,
-                                   data=prepared_request.data,
-                                   headers=prepared_request.headers)
-        wrapped_response = ResponseWrapper(response,
-                                           session=self,
-                                           request_data=prepared_request.data,
-                                           server_cert=self._server_cert)
-        await wrapped_response.get_text(self.encryption)
-        return wrapped_response
+        if 'Connection' not in prepared_request.headers:
+            print('Here')
+        resp = await self.post(url=prepared_request.url,
+                               data=prepared_request.data,
+                               headers=prepared_request.headers)
+        return await self.handle_encryption(resp)
+
+    async def handle_encryption(self, response):
+        await response.read()
+        if self.encryption:
+            await self.encryption.parse_encrypted_response(response)
+        return response
 
     def _get_args(self, mandatory_args, optional_args, function):
         argspec = set(inspect.getargspec(function).args)
@@ -272,6 +274,7 @@ class AutoSession(aiohttp.ClientSession):
             prepared_request = PreparedRequest(url, headers=self.default_headers, data=data)
 
         resp = await self._send_message_request(prepared_request)
+        resp = await self.handle_encryption(resp)
         if hasattr(self.auth, 'handle_response'):
             resp = await self.auth.handle_response(resp)
         return resp

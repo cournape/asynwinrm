@@ -22,26 +22,38 @@ class PreparedRequest(object):
 
 class MyRequestInfo(object):
 
-    def __init__(self, url, method, headers, data=None):
+    def __init__(self, url, method, headers, data=None, session=None):
         self.url = url
         self.method = method
         self.headers = headers
         self.data = data
+        self.session = session
 
 
 class WrappedRequestClass(aiohttp.ClientRequest):
 
     @property
     def request_info(self):
-        return MyRequestInfo(self.url, self.method, self.headers, self.body._value)
+        body = self.body
+        if hasattr(body, '_value'):
+            body = body._value
+        return MyRequestInfo(self.url,
+                             self.method,
+                             self.headers,
+                             body,
+                             self._session)
 
 
 class WrappedResponseClass(aiohttp.ClientResponse):
 
+    def __init__(self, *args, **kwargs):
+        self._peer_cert = None
+        self._data = None
+        super(WrappedResponseClass, self).__init__(*args, **kwargs)
+
     @property
     def peer_cert(self):
-        if hasattr(self, '_peer_cert'):
-            return self._peer_cert
+        return self._peer_cert
 
     async def start(self, connection, read_until_eof=False):
         try:
@@ -50,51 +62,28 @@ class WrappedResponseClass(aiohttp.ClientResponse):
             pass
         return await super(WrappedResponseClass, self).start(connection, read_until_eof)
 
-
-class ResponseWrapper(object):
-
-    def __init__(self, response, session, request_data, server_cert=None):
-        self.request_data = request_data
-        self.server_cert = server_cert
-        self.response = response
-        self.session = session
-        self._text = None
-
-    @property
-    def status(self):
-        return self.response.status
-
-    async def get_text(self, encryption):
-        if self._text is None:
-            if encryption:
-                self.content = await self.response.read()
-                self._text = encryption.parse_encrypted_response(self) if self.content else self.content
-            else:
-                self._text = await self.response.text()
-        return self._text
-
-    @property
-    def text(self):
-        return self._text
-
-    @property
-    def headers(self):
-        return self.response.headers
-
-    @property
-    def url(self):
-        return str(self.response.url)
-
-    @property
-    def request(self):
-        return self.response.request_info
-
     def recycle(self):
-        request = self.request
+        req_info = self._request_info
         return PreparedRequest(
-            data=self.request_data,
-            url=self.url,
-            headers=request.headers,
-            method=request.method,
-            session=self.session
+            data=req_info.data,
+            url=str(self.url),
+            headers=req_info.headers,
+            method=req_info.method,
+            session=req_info.session
         )
+
+    @property
+    def ok(self):
+        return self.status == 200
+
+    def set_content(self, content):
+        self._content = content
+
+    @property
+    def text_sync(self):
+        """Read response payload and decode."""
+        if self._content is None:
+            raise Exception('First call .read()')
+
+        encoding = self.get_encoding()
+        return self._content.decode(encoding, errors='strict')

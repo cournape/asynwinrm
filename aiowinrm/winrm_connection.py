@@ -49,9 +49,9 @@ class WinRmConnection(object):
 
         resp = await self.session.winrm_request(self.options.url,
                                                 data=payload_bytes)
-
-        if resp.text:
-            root = etree.fromstring(resp.text)
+        resp_text = await resp.text()
+        if resp_text:
+            root = etree.fromstring(resp_text)
 
             # raises exception if soap response action is a "fault"
             parsed = parse_soap_response(root)
