@@ -1,7 +1,7 @@
 import lxml.etree as etree
 
-from aiowinrm.sec.auto_session import AutoSession
-from aiowinrm.errors import AIOWinRMException, InvalidCredentialsError
+from aiowinrm.sec.windows_session import WindowsSession
+from aiowinrm.errors import AIOWinRMException
 from aiowinrm.soap.protocol import parse_soap_response
 
 
@@ -22,7 +22,7 @@ class WinRmConnection(object):
         return self._session
 
     def build_session(self):
-        return AutoSession(
+        return WindowsSession(
             endpoint=self.options.url,
             realm=self.options.realm,
             username=self.options.username,

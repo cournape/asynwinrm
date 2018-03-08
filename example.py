@@ -4,7 +4,8 @@ from aiowinrm import \
     run_ps, \
     run_psrp, \
     build_win_rm_url, \
-    ConnectionOptions
+    ConnectionOptions, \
+    AuthEnum
 
 
 def print_output(res):
@@ -34,6 +35,7 @@ if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     connection_options = ConnectionOptions(
         winrm_url=build_win_rm_url('1.2.3.4', use_https=True),
+        auth_method=AuthEnum.Basic,  # since we're using https anyway
         username='administrator',
         password='password',
         verify_ssl=False,

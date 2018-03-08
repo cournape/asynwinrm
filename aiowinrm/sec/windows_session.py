@@ -52,9 +52,7 @@ except ImportError as ie:
 """
 
 
-
-
-class AutoSession(aiohttp.ClientSession):
+class WindowsSession(aiohttp.ClientSession):
 
     def __init__(self,
                  endpoint,
@@ -132,10 +130,10 @@ class AutoSession(aiohttp.ClientSession):
 
         self.auth = None
         self.headers = CaseInsensitiveDict()
-        super(AutoSession, self).__init__(connector=connector,
-                                          loop=loop,
-                                          response_class=WrappedResponseClass,
-                                          request_class=WrappedRequestClass)
+        super(WindowsSession, self).__init__(connector=connector,
+                                             loop=loop,
+                                             response_class=WrappedResponseClass,
+                                             request_class=WrappedRequestClass)
 
     async def build_auth(self):
         # not using env vars
