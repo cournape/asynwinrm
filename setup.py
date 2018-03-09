@@ -1,16 +1,14 @@
 import ast
-import binascii
 import os
 import re
 import subprocess
-import textwrap
 
 from setuptools import setup
 
 
 MAJOR = 0
-MINOR = 0
-MICRO = 2
+MINOR = 1
+MICRO = 0
 
 IS_RELEASED = False
 
@@ -18,13 +16,20 @@ PREVIOUS_VERSION = "d1c718c330dd24ee7fd1112c4ea4d571f8f4e45c"
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
 INSTALL_REQUIRES = (
-    "attrs>=16.0.0",
+    "attrs >= 16.0.0",
     "lxml >= 3.6.0",
+    "asyncio >= 1.3.0",
+    "aiohttp >=3.0.6",
+    "pykerberos >= 1.2.0",
+    "pycryptodome >= 3.5.0",
+    "ntlm_auth >= 1.1.0"
 )
 
 PACKAGES = (
     "aiowinrm",
     "aiowinrm.soap",
+    "aiowinrm.sec",
+    "aiowinrm.psrp",
 )
 
 
@@ -171,11 +176,11 @@ def main():
     version = parse_version(version_file)
 
     setup(
-        author="David Cournapeau",
-        author_email="cournape@gmail.com",
+        author="Sjuul Janssen",
+        author_email="sjuul@transceptor.technology",
         name="aiowinrm",
         description="A python 3.5+ async library for the WinRM protocol",
-        url="https://github.com/cournape/aio-winrm",
+        url="https://github.com/obeleh/aio-winrm",
         version=version,
         license="Apache 2.0",
         packages=PACKAGES,

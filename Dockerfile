@@ -6,4 +6,3 @@ RUN apt install -y --no-install-recommends kinit krb5-user python3 build-essenti
 COPY requirements.txt .
 RUN pip3 install setuptools wheel # pykerberos: ModuleNotFoundError: No module named 'setuptools'
 RUN pip3 install -r requirements.txt
-RUN pip3 install xmltodict six requests requests_ntlm requests_kerberos requests_credssp

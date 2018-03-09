@@ -4,3 +4,7 @@ aiowinrm/_version.py
 aiowinrm/.DS_Store
 aiowinrm/xml/*
 *__pycache__*
+aiowinrm.egg-info
+build/*
+dist/*
+example_nogit.py
