@@ -30,7 +30,7 @@ class MyRequestInfo(object):
         self.session = session
 
 
-class WrappedRequestClass(aiohttp.ClientRequest):
+class AioWinRmRequestClass(aiohttp.ClientRequest):
 
     @property
     def request_info(self):
@@ -42,39 +42,3 @@ class WrappedRequestClass(aiohttp.ClientRequest):
                              self.headers,
                              body,
                              self._session)
-
-
-class WrappedResponseClass(aiohttp.ClientResponse):
-
-    def __init__(self, *args, **kwargs):
-        self._peer_cert = None
-        self._data = None
-        super(WrappedResponseClass, self).__init__(*args, **kwargs)
-
-    @property
-    def peer_cert(self):
-        return self._peer_cert
-
-    async def start(self, connection, read_until_eof=False):
-        try:
-            self._peer_cert = connection.transport._ssl_protocol._extra['ssl_object'].getpeercert(True)
-        except Exception:
-            pass
-        return await super(WrappedResponseClass, self).start(connection, read_until_eof)
-
-    def recycle(self):
-        req_info = self._request_info
-        return PreparedRequest(
-            data=req_info.data,
-            url=str(self.url),
-            headers=req_info.headers,
-            method=req_info.method,
-            session=req_info.session
-        )
-
-    @property
-    def ok(self):
-        return self.status == 200
-
-    def set_content(self, content):
-        self._content = content

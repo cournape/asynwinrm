@@ -29,7 +29,6 @@ KERB_TEMPLATE = """
 KERB_CONF = '/etc/krb5.conf'
 
 
-
 class UnknownSignatureAlgorithmOID(Warning):
     pass
 

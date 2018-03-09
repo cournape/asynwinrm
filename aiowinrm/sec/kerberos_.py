@@ -250,7 +250,7 @@ class HTTPKerberosAuth(object):
                 return response
 
             elif is_http_error or self.mutual_authentication == OPTIONAL:
-                if not response.ok:
+                if not response.status == 200:
                     log.error('handle_other(): Mutual authentication unavailable '
                               'on {0} response'.format(response.status))
 

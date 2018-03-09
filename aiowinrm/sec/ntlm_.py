@@ -1,7 +1,5 @@
-import warnings
-
 import binascii
-from aiowinrm.sec.prepared_request import WrappedResponseClass
+from aiowinrm.sec.response import AioWinRmResponseClass
 from aiowinrm.sec.utils import get_certificate_hash
 from ntlm_auth import ntlm
 
@@ -45,7 +43,7 @@ class HttpNtlmAuth(object):
         """
         Attempt to authenticate using HTTP NTLM challenge/response.
         """
-        assert isinstance(response, WrappedResponseClass)
+        assert isinstance(response, AioWinRmResponseClass)
         # Get the certificate of the server if using HTTPS for CBT
         server_certificate_hash = self._get_server_cert(response)
 
@@ -146,7 +144,7 @@ class HttpNtlmAuth(object):
         :param response: The original 401 response from the server
         :return: The hash of the DER encoded certificate at the request_url or None if not a HTTPS endpoint
         """
-        assert isinstance(response, WrappedResponseClass)
+        assert isinstance(response, AioWinRmResponseClass)
         if self.send_cbt and response.peer_cert:
             certificate_hash_bytes = get_certificate_hash(response.peer_cert)
             return binascii.hexlify(certificate_hash_bytes).decode().upper()

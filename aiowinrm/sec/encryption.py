@@ -1,16 +1,9 @@
 import re
 import struct
-import sys
 
 from aiowinrm.errors import AIOWinRMException
-from aiowinrm.sec.prepared_request import PreparedRequest
-
-is_py2 = sys.version[0] == '2'
-
-if is_py2:
-    from urlparse import urlsplit
-else:
-    from urllib.parse import urlsplit
+from aiowinrm.sec.request import PreparedRequest
+from urllib.parse import urlsplit
 
 
 class Encryption(object):

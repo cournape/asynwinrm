@@ -5,8 +5,8 @@ import aiohttp
 
 from aiowinrm.sec.encryption import Encryption
 from aiowinrm.errors import InvalidCredentialsError, AIOWinRMException
-from aiowinrm.sec.prepared_request import PreparedRequest, WrappedResponseClass, WrappedRequestClass
-
+from aiowinrm.sec.request import PreparedRequest, AioWinRmRequestClass
+from aiowinrm.sec.response import AioWinRmResponseClass
 
 HAVE_KERBEROS = False
 HAVE_CREDSSP = False
@@ -115,8 +115,8 @@ class WindowsSession(aiohttp.ClientSession):
         self.auth = None
         super(WindowsSession, self).__init__(connector=connector,
                                              loop=loop,
-                                             response_class=WrappedResponseClass,
-                                             request_class=WrappedRequestClass)
+                                             response_class=AioWinRmResponseClass,
+                                             request_class=AioWinRmRequestClass)
 
     async def build_auth(self):
         # not using env vars
