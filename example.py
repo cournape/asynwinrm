@@ -38,7 +38,7 @@ if __name__ == '__main__':
         auth_method=AuthEnum.Basic,  # since we're using https anyway
         username='administrator',
         password='password',
-        verify_ssl=False,
+        verify_ssl=False,  # if using self signed certificate
         loop=loop
     )
     coro = run_psrp_print(connection_options, "Get-WmiObject Win32_OperatingSystem")

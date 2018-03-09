@@ -3,3 +3,4 @@ lxml
 aiohttp
 pykerberos
 pycryptodome
+ntlm_auth

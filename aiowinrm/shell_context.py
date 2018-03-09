@@ -32,8 +32,9 @@ class ShellContext(object):
         if self.shell_id is None and ex is None:
             raise RuntimeError("__aexit__ called without __aenter__")
 
-        payload = close_shell_payload(self.shell_id)
-        await self._win_rm_connection.request(payload)
+        if self.shell_id:
+            payload = close_shell_payload(self.shell_id)
+            await self._win_rm_connection.request(payload)
         await self._win_rm_connection.close()
 
     @property

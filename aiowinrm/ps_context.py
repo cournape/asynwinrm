@@ -112,7 +112,7 @@ class PowerShellContext(object):
             await self._win_rm_connection.close()
             raise RuntimeError("__aexit__ called without __aenter__")
 
-        if isinstance(ex, SoapTimeout):
+        if self.shell_id:
             payload = close_shell_payload(self.shell_id, power_shell=True)
             await self._win_rm_connection.request(payload)
         await self._win_rm_connection.close()

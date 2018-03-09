@@ -1,8 +1,9 @@
 import asyncio
 import aiohttp
 
-from aiowinrm.sec import AuthEnum, set_kerb_pwd
+from aiowinrm.sec import AuthEnum
 from aiowinrm.errors import AIOWinRMException
+from aiowinrm.sec.utils import set_kerb_pwd
 from aiowinrm.utils import check_url
 
 
@@ -69,8 +70,12 @@ class ConnectionOptions(object):
         self.send_cbt = send_cbt
         self.keytab = keytab
 
-    def get_kerb_ticket(self):
-        set_kerb_pwd(self.username, self.password, self.realm, self.ad_server)
+    def get_kerb_ticket(self, generate_kerb_conf=False):
+        set_kerb_pwd(username=self.username,
+                     password=self.password,
+                     realm=self.realm,
+                     ad_server=self.ad_server,
+                     generate_kerb_conf=generate_kerb_conf)
 
     @property
     def connector(self):

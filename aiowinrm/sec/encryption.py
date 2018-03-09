@@ -86,21 +86,19 @@ class Encryption(object):
         }
         return PreparedRequest(url=endpoint, data=encrypted_message, headers=headers)
 
-    async def parse_encrypted_response(self, response):
+    def parse_encrypted_response(self, content_type, response_content, host):
         """
-        Takes in the encrypted response from the server and decrypts it
+        Decides whether to decrypt the response based on content-type
 
-        :param response: The response that needs to be decrytped
-        :return: The unencrypted message from the server
+        :param content_type:
+        :param response_content:
+        :param host:
+        :return:
         """
-        content_type = response.headers['Content-Type']
         if 'protocol="{0}"'.format(self.protocol_string.decode()) in content_type:
-            msg = self._decrypt_response(response, response.host)
-            response.set_content(msg)
+            return self._decrypt_response(response_content, host)
         else:
-            msg = response.content
-
-        return msg
+            return response_content
 
     def _encrypt_message(self, message, host):
         message_length = str(len(message)).encode()
@@ -115,8 +113,8 @@ class Encryption(object):
 
         return message_payload
 
-    def _decrypt_response(self, response, host):
-        parts = response.content.split(self.MIME_BOUNDARY + b'\r\n')
+    def _decrypt_response(self, response_content, host):
+        parts = response_content.split(self.MIME_BOUNDARY + b'\r\n')
         parts = list(filter(None, parts)) # filter out empty parts of the split
         message = b''
 

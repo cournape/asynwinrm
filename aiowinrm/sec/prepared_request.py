@@ -78,12 +78,3 @@ class WrappedResponseClass(aiohttp.ClientResponse):
 
     def set_content(self, content):
         self._content = content
-
-    @property
-    def text_sync(self):
-        """Read response payload and decode."""
-        if self._content is None:
-            raise Exception('First call .read()')
-
-        encoding = self.get_encoding()
-        return self._content.decode(encoding, errors='strict')

@@ -13,6 +13,7 @@ class WinRmConnection(object):
     def __init__(self, options):
         self.options = options
         self._session = None
+        self._closed = False
 
     @property
     def session(self):
@@ -43,8 +44,9 @@ class WinRmConnection(object):
             keytab=self.options.keytab,
         )
 
-
     async def request(self, xml_payload):
+        if self._closed:
+            raise AIOWinRMException('Connection already closed')
         payload_bytes = etree.tostring(xml_payload)
 
         resp = await self.session.winrm_request(self.options.url,
