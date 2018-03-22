@@ -1,2 +1,10 @@
+.idea/*
 aiowinrm/_version.py
 .coverage
+aiowinrm/.DS_Store
+aiowinrm/xml/*
+*__pycache__*
+aiowinrm.egg-info
+build/*
+dist/*
+example_nogit.py

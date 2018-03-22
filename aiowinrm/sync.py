@@ -74,7 +74,7 @@ class CommandContext:
         resp = self._session.post(self.host, data=payload)
         resp.raise_for_status()
 
-    def _output_request(self):
+    def output_request(self):
         payload = etree.tostring(command_output(self._shell_id, self._command_id))
         resp = self._session.post(self.host, data=payload)
         resp.raise_for_status()
@@ -92,7 +92,7 @@ class CommandContext:
         is_done = False
 
         while not is_done:
-            out, err, return_code, is_done = self._output_request()
+            out, err, return_code, is_done = self.output_request()
 
             if out:
                 out_buffer.append(out)
